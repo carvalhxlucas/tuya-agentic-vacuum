@@ -8,11 +8,12 @@ from agent.tools import (
     clean_specific_room,
     locate_robot,
     return_to_base,
+    set_suction,
     start_cleaning,
     stop_cleaning,
 )
 
-ROBOT_TOOLS = [start_cleaning, stop_cleaning, return_to_base, locate_robot, clean_specific_room]
+ROBOT_TOOLS = [start_cleaning, stop_cleaning, return_to_base, locate_robot, set_suction, clean_specific_room]
 
 def _friendly_message(action: str, params: dict) -> str:
     if action == "start_cleaning":
@@ -23,6 +24,11 @@ def _friendly_message(action: str, params: dict) -> str:
         return "Entendido, mandando o robô voltar para a base."
     if action == "locate_robot":
         return "Entendido, enviando comando para o robô se localizar."
+    if action == "set_suction":
+        level = (params or {}).get("level") if isinstance(params, dict) else None
+        if isinstance(level, str):
+            return f"Entendido, ajustando sucção para {level}."
+        return "Entendido, sucção ajustada."
     if action == "clean_specific_room":
         room = (params or {}).get("room_name") if isinstance(params, dict) else None
         if isinstance(room, str):
@@ -54,6 +60,15 @@ def _fallback_intent(message: str) -> tuple[str, Optional[str], Optional[dict]]:
         return ("Entendido, mandando o robô voltar para a base.", "return_to_base", None)
     if any(w in text for w in ["localizar", "encontrar", "onde está", "achar"]):
         return ("Entendido, enviando comando para o robô se localizar.", "locate_robot", None)
+    if any(w in text for w in ["sucção", "potência", "aspiração"]):
+        level = "normal"
+        if "máxima" in text or "forte" in text or "strong" in text:
+            level = "strong"
+        elif "mínima" in text or "suave" in text or "gentle" in text:
+            level = "gentle"
+        elif "standby" in text or "eco" in text:
+            level = "standby"
+        return (f"Entendido, ajustando sucção para {level}.", "set_suction", {"level": level})
     room_match = re.search(r"limpar\s+(?:a\s+|o\s+)?(\w+)", text)
     if room_match:
         room = room_match.group(1)

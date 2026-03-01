@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from agent import create_agent, execute_agent
+from agent.tools import get_device_state
 
 LIFESPAN = None
 
@@ -55,9 +56,22 @@ class ChatResponse(BaseModel):
     actionPayload: Optional[ActionPayload] = None
 
 
+class RobotStateResponse(BaseModel):
+    status: str
+    batteryLevel: int
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/robot/state", response_model=RobotStateResponse)
+async def robot_state():
+    state = get_device_state()
+    if state is None:
+        return RobotStateResponse(status="idle", batteryLevel=0)
+    return RobotStateResponse(**state)
 
 
 @app.post("/chat", response_model=ChatResponse)
