@@ -3,11 +3,11 @@ import { Battery, AlertCircle, Home, Loader2, CheckCircle } from 'lucide-react'
 import type { RobotStatus } from '../types/robot'
 
 const statusConfig: Record<RobotStatus, { label: string; icon: typeof Home; color: string }> = {
-  cleaning: { label: 'Limpando', icon: Loader2, color: 'text-neon-cyan' },
-  docked: { label: 'Na base', icon: Home, color: 'text-emerald-400' },
-  idle: { label: 'Parado', icon: CheckCircle, color: 'text-gray-400' },
-  error: { label: 'Erro', icon: AlertCircle, color: 'text-red-400' },
-  returning: { label: 'Voltando', icon: Loader2, color: 'text-neon-purple' },
+  cleaning: { label: 'Cleaning', icon: Loader2, color: 'text-neon-cyan' },
+  docked: { label: 'Docked', icon: Home, color: 'text-emerald-400' },
+  idle: { label: 'Idle', icon: CheckCircle, color: 'text-gray-400' },
+  error: { label: 'Error', icon: AlertCircle, color: 'text-red-400' },
+  returning: { label: 'Returning', icon: Loader2, color: 'text-neon-purple' },
 }
 
 interface HeaderProps {
@@ -34,7 +34,7 @@ export function Header({ status, batteryLevel }: HeaderProps) {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-gray-500">Bateria</span>
+        <span className="text-xs text-gray-500">Battery</span>
         <div className="relative w-10 h-10">
           <svg className="w-10 h-10 -rotate-90" viewBox="0 0 40 40">
             <circle

@@ -2,10 +2,10 @@ import { motion } from 'framer-motion'
 import { Play, Pause, Home, MapPin } from 'lucide-react'
 
 const controls = [
-  { id: 'start', label: 'Iniciar', icon: Play, action: 'start_cleaning' },
-  { id: 'pause', label: 'Pausar', icon: Pause, action: 'stop_cleaning' },
-  { id: 'base', label: 'Voltar à base', icon: Home, action: 'return_to_base' },
-  { id: 'locate', label: 'Localizar', icon: MapPin, action: 'locate' },
+  { id: 'start', label: 'Start', icon: Play, action: 'start_cleaning' },
+  { id: 'pause', label: 'Pause', icon: Pause, action: 'stop_cleaning' },
+  { id: 'base', label: 'Return to base', icon: Home, action: 'return_to_base' },
+  { id: 'locate', label: 'Locate', icon: MapPin, action: 'locate' },
 ] as const
 
 interface QuickControlsProps {

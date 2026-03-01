@@ -31,16 +31,16 @@ def _get_tuya_client() -> tuple[Any, Optional[str]]:
 def _send_commands(commands: list[dict]) -> str:
     client, device_id = _get_tuya_client()
     if client is None or device_id is None:
-        return "Dispositivo Tuya não configurado. Verifique TUYA_ACCESS_ID, TUYA_ACCESS_SECRET e TUYA_DEVICE_ID no .env."
+        return "Tuya device not configured. Check TUYA_ACCESS_ID, TUYA_ACCESS_SECRET and TUYA_DEVICE_ID in .env."
     path = f"/v1.0/iot-03/devices/{device_id}/commands"
     payload = {"commands": commands}
     try:
         response = client.post(path, payload)
         if not response.get("success", True):
-            return f"Comando recusado pelo dispositivo: {response.get('msg', 'erro desconhecido')}."
+            return f"Command rejected by device: {response.get('msg', 'unknown error')}."
         return "ok"
     except Exception as e:
-        return f"Falha ao comunicar com o robô: {str(e)}."
+        return f"Failed to communicate with robot: {str(e)}."
 
 
 def get_device_state() -> Optional[dict]:
@@ -99,56 +99,56 @@ def get_device_state() -> Optional[dict]:
 
 @tool
 def start_cleaning() -> str:
-    """Inicia a limpeza do robô aspirador. Use quando o usuário pedir para limpar, aspirar, começar, iniciar limpeza."""
+    """Starts the vacuum robot cleaning. Use when the user asks to clean, vacuum, start, or begin cleaning."""
     result = _send_commands([{"code": "switch_go", "value": True}])
     if result == "ok":
-        return "Limpeza iniciada."
+        return "Cleaning started."
     return result
 
 
 @tool
 def stop_cleaning() -> str:
-    """Para a limpeza do robô. Use quando o usuário pedir para parar, pausar, interromper."""
+    """Stops the robot cleaning. Use when the user asks to stop, pause, or interrupt."""
     result = _send_commands([{"code": "switch_go", "value": False}])
     if result == "ok":
-        return "Limpeza pausada."
+        return "Cleaning paused."
     return result
 
 
 @tool
 def return_to_base() -> str:
-    """Envia o robô de volta para a base de carregamento. Use quando o usuário pedir para voltar, retornar à base, encostar, carregar."""
+    """Sends the robot back to the charging base. Use when the user asks to return, go back to base, or dock."""
     result = _send_commands([{"code": "switch_charge", "value": True}])
     if result == "ok":
-        return "Robô retornando à base."
+        return "Robot returning to base."
     return result
 
 
 @tool
 def locate_robot() -> str:
-    """Faz o robô emitir um som ou sinal para localização. Use quando o usuário pedir para encontrar, localizar, onde está o robô."""
+    """Makes the robot emit a sound or signal for location. Use when the user asks to find, locate, or where is the robot."""
     result = _send_commands([{"code": "find_robot", "value": True}])
     if result == "ok":
-        return "Comando de localização enviado."
+        return "Locate command sent."
     return result
 
 
 @tool
 def set_suction(level: str) -> str:
-    """Ajusta o nível de sucção do aspirador. level: um de 'standby', 'gentle', 'normal', 'strong'. Use quando o usuário pedir para mudar sucção, aumentar/diminuir potência."""
+    """Adjusts the vacuum suction level. level: one of 'standby', 'gentle', 'normal', 'strong'. Use when the user asks to change suction or power."""
     level = (level or "").strip().lower()
     if level not in ("standby", "gentle", "normal", "strong"):
-        return f"Nível de sucção inválido: use um de standby, gentle, normal, strong (recebido: {level or 'vazio'})."
+        return f"Invalid suction level: use one of standby, gentle, normal, strong (received: {level or 'empty'})."
     result = _send_commands([{"code": "suction", "value": level}])
     if result == "ok":
-        return f"Sucção ajustada para {level}."
+        return f"Suction set to {level}."
     return result
 
 
 @tool
 def clean_specific_room(room_name: str) -> str:
-    """Limpa um cômodo específico da casa. room_name: nome do cômodo (ex: cozinha, sala, quarto, banheiro)."""
+    """Cleans a specific room in the house. room_name: name of the room (e.g. kitchen, living room, bedroom, bathroom)."""
     result = _send_commands([{"code": "switch_go", "value": True}])
     if result == "ok":
-        return f"Limpando o cômodo: {room_name}."
+        return f"Cleaning room: {room_name}."
     return result

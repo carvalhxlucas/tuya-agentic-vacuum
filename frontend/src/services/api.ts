@@ -19,7 +19,7 @@ export async function sendChatCommand(command: string): Promise<ChatResponse> {
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error((err as { detail?: string }).detail ?? 'Falha ao processar comando')
+    throw new Error((err as { detail?: string }).detail ?? 'Failed to process command')
   }
   return res.json()
 }
@@ -27,7 +27,7 @@ export async function sendChatCommand(command: string): Promise<ChatResponse> {
 export async function getRobotState(): Promise<RobotState> {
   const res = await fetch(`${API_BASE}/robot/state`)
   if (!res.ok) {
-    throw new Error('Falha ao obter estado do robô')
+    throw new Error('Failed to get robot state')
   }
   const data = await res.json()
   return {

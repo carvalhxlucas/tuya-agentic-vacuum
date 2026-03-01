@@ -11,7 +11,7 @@ export default defineConfig({
       manifest: {
         name: 'AI Vacuum Robot Control',
         short_name: 'Vacuum AI',
-        description: 'Controle seu robô aspirador por linguagem natural',
+        description: 'Control your vacuum robot with natural language',
         theme_color: '#0f0f1a',
         background_color: '#0f0f1a',
         display: 'standalone',

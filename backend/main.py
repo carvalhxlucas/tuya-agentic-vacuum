@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Vacuum Robot API",
-    description="API para controle do robô aspirador por linguagem natural",
+    description="API for controlling the vacuum robot via natural language",
     version="1.0.0",
     lifespan=lifespan,
 )
@@ -77,9 +77,9 @@ async def robot_state():
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     if not request.message or not request.message.strip():
-        raise HTTPException(status_code=400, detail="Mensagem não pode ser vazia")
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
     if LIFESPAN is None:
-        raise HTTPException(status_code=503, detail="Agente não inicializado")
+        raise HTTPException(status_code=503, detail="Agent not initialized")
     try:
         response_message, action_name, action_params = execute_agent(LIFESPAN, request.message.strip())
         action_payload = None

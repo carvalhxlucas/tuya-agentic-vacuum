@@ -17,63 +17,63 @@ ROBOT_TOOLS = [start_cleaning, stop_cleaning, return_to_base, locate_robot, set_
 
 def _friendly_message(action: str, params: dict) -> str:
     if action == "start_cleaning":
-        return "Entendido, iniciando a limpeza agora."
+        return "Got it, starting cleaning now."
     if action == "stop_cleaning":
-        return "Entendido, pausando o robô."
+        return "Got it, pausing the robot."
     if action == "return_to_base":
-        return "Entendido, mandando o robô voltar para a base."
+        return "Got it, sending the robot back to base."
     if action == "locate_robot":
-        return "Entendido, enviando comando para o robô se localizar."
+        return "Got it, sending locate command to the robot."
     if action == "set_suction":
         level = (params or {}).get("level") if isinstance(params, dict) else None
         if isinstance(level, str):
-            return f"Entendido, ajustando sucção para {level}."
-        return "Entendido, sucção ajustada."
+            return f"Got it, setting suction to {level}."
+        return "Got it, suction adjusted."
     if action == "clean_specific_room":
         room = (params or {}).get("room_name") if isinstance(params, dict) else None
         if isinstance(room, str):
-            return f"Entendido, mandando o robô limpar {room} agora."
-    return "Comando executado."
+            return f"Got it, sending the robot to clean {room} now."
+    return "Command executed."
 
 
-SYSTEM_PROMPT = """Você é o assistente de controle de um robô aspirador. O usuário dá comandos em linguagem natural.
-Sua tarefa é interpretar a intenção e usar EXATAMENTE uma das ferramentas disponíveis.
-Responda em português, de forma breve e amigável, confirmando a ação executada.
-Use apenas as ferramentas fornecidas; não invente outras ações."""
+SYSTEM_PROMPT = """You are the control assistant for a vacuum robot. The user gives commands in natural language.
+Your task is to interpret the intent and use EXACTLY one of the available tools.
+Respond in English, briefly and in a friendly way, confirming the action executed.
+Use only the provided tools; do not invent other actions."""
 
 
 def _fallback_intent(message: str) -> tuple[str, Optional[str], Optional[dict]]:
     text = message.lower().strip()
-    if any(w in text for w in ["limpar", "limpe", "aspirar", "começar", "iniciar", "liga", "start"]):
-        if "cozinha" in text:
-            return ("Entendido, mandando o robô limpar a cozinha agora.", "clean_specific_room", {"room_name": "cozinha"})
-        if "sala" in text:
-            return ("Entendido, mandando o robô limpar a sala agora.", "clean_specific_room", {"room_name": "sala"})
-        if "quarto" in text:
-            return ("Entendido, mandando o robô limpar o quarto agora.", "clean_specific_room", {"room_name": "quarto"})
-        if "banheiro" in text:
-            return ("Entendido, mandando o robô limpar o banheiro agora.", "clean_specific_room", {"room_name": "banheiro"})
-        return ("Entendido, iniciando a limpeza agora.", "start_cleaning", None)
-    if any(w in text for w in ["parar", "pause", "pausar", "interromper", "para"]):
-        return ("Entendido, pausando o robô.", "stop_cleaning", None)
-    if any(w in text for w in ["voltar", "base", "encostar", "retornar", "carregar", "volta"]):
-        return ("Entendido, mandando o robô voltar para a base.", "return_to_base", None)
-    if any(w in text for w in ["localizar", "encontrar", "onde está", "achar"]):
-        return ("Entendido, enviando comando para o robô se localizar.", "locate_robot", None)
-    if any(w in text for w in ["sucção", "potência", "aspiração"]):
+    if any(w in text for w in ["clean", "vacuum", "start", "sweep", "begin"]):
+        if "kitchen" in text:
+            return ("Got it, sending the robot to clean the kitchen now.", "clean_specific_room", {"room_name": "kitchen"})
+        if "living" in text:
+            return ("Got it, sending the robot to clean the living room now.", "clean_specific_room", {"room_name": "living room"})
+        if "bedroom" in text or "bed room" in text:
+            return ("Got it, sending the robot to clean the bedroom now.", "clean_specific_room", {"room_name": "bedroom"})
+        if "bathroom" in text or "bath" in text:
+            return ("Got it, sending the robot to clean the bathroom now.", "clean_specific_room", {"room_name": "bathroom"})
+        return ("Got it, starting cleaning now.", "start_cleaning", None)
+    if any(w in text for w in ["stop", "pause", "halt"]):
+        return ("Got it, pausing the robot.", "stop_cleaning", None)
+    if any(w in text for w in ["return", "base", "dock", "charge", "go back"]):
+        return ("Got it, sending the robot back to base.", "return_to_base", None)
+    if any(w in text for w in ["locate", "find", "where is"]):
+        return ("Got it, sending locate command to the robot.", "locate_robot", None)
+    if any(w in text for w in ["suction", "power", "strength"]):
         level = "normal"
-        if "máxima" in text or "forte" in text or "strong" in text:
+        if "max" in text or "strong" in text or "high" in text:
             level = "strong"
-        elif "mínima" in text or "suave" in text or "gentle" in text:
+        elif "min" in text or "gentle" in text or "low" in text:
             level = "gentle"
         elif "standby" in text or "eco" in text:
             level = "standby"
-        return (f"Entendido, ajustando sucção para {level}.", "set_suction", {"level": level})
-    room_match = re.search(r"limpar\s+(?:a\s+|o\s+)?(\w+)", text)
+        return (f"Got it, setting suction to {level}.", "set_suction", {"level": level})
+    room_match = re.search(r"clean\s+(?:the\s+)?(\w+(?:\s+\w+)?)", text)
     if room_match:
-        room = room_match.group(1)
-        return (f"Entendido, mandando o robô limpar {room} agora.", "clean_specific_room", {"room_name": room})
-    return ("Não identifiquei um comando válido. Você pode pedir para iniciar ou pausar a limpeza, voltar à base, localizar o robô ou limpar um cômodo específico.", None, None)
+        room = room_match.group(1).strip()
+        return (f"Got it, sending the robot to clean {room} now.", "clean_specific_room", {"room_name": room})
+    return ("I didn't recognize a valid command. You can ask to start or pause cleaning, return to base, locate the robot, or clean a specific room.", None, None)
 
 
 def create_agent() -> Any:
@@ -112,6 +112,6 @@ def execute_agent(agent: Any, message: str) -> tuple[str, Optional[str], Optiona
                 tool_map[name].invoke(args)
                 friendly = _friendly_message(name, args)
                 return (friendly, name, args if isinstance(args, dict) else None)
-        return (response.content or "Comando processado.", None, None)
+        return (response.content or "Command processed.", None, None)
     except Exception:
         return _fallback_intent(message)

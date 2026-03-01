@@ -54,7 +54,7 @@ export function CommandBar({ onActionExecuted, onProcessingChange }: CommandBarP
         const errorMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: err instanceof Error ? err.message : 'Erro ao processar comando.',
+          content: err instanceof Error ? err.message : 'Failed to process command.',
           timestamp: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, errorMessage])
@@ -74,7 +74,7 @@ export function CommandBar({ onActionExecuted, onProcessingChange }: CommandBarP
     >
       <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
         <Sparkles className="w-4 h-4 text-neon-purple" />
-        <span className="text-sm text-gray-400">O que o robô deve fazer agora?</span>
+        <span className="text-sm text-gray-400">What should the robot do now?</span>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-[120px]">
         <AnimatePresence mode="popLayout">
@@ -84,7 +84,7 @@ export function CommandBar({ onActionExecuted, onProcessingChange }: CommandBarP
               animate={{ opacity: 1 }}
               className="text-sm text-gray-500 text-center py-4"
             >
-              Digite ou fale um comando. Ex: &quot;Limpe a cozinha&quot;, &quot;Volte para a base&quot;
+              Type or speak a command. E.g. &quot;Clean the kitchen&quot;, &quot;Return to base&quot;
             </motion.p>
           )}
           {messages.map((msg) => (
@@ -112,7 +112,7 @@ export function CommandBar({ onActionExecuted, onProcessingChange }: CommandBarP
               className="flex items-center gap-2 text-neon-purple text-sm"
             >
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processando...</span>
+              <span>Processing...</span>
             </motion.div>
           )}
         </AnimatePresence>
@@ -123,14 +123,14 @@ export function CommandBar({ onActionExecuted, onProcessingChange }: CommandBarP
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Comando em linguagem natural..."
+            placeholder="Natural language command..."
             disabled={isProcessing}
             className="flex-1 bg-void-800/80 border border-white/10 rounded-xl px-4 py-3 text-sm placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-neon-purple/50 focus:border-neon-purple/50 transition-all"
           />
           <button
             type="button"
             className="p-3 rounded-xl glass-panel glass-panel-hover text-gray-400 hover:text-neon-purple"
-            aria-label="Falar"
+            aria-label="Speak"
           >
             <Mic className="w-5 h-5" />
           </button>

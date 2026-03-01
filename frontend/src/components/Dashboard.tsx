@@ -50,7 +50,7 @@ export function Dashboard() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: action === 'start_cleaning' ? 'Iniciar limpeza' : action === 'stop_cleaning' ? 'Parar' : action === 'return_to_base' ? 'Voltar para a base' : 'Localizar o robô',
+          message: action === 'start_cleaning' ? 'Start cleaning' : action === 'stop_cleaning' ? 'Stop' : action === 'return_to_base' ? 'Return to base' : 'Locate the robot',
         }),
       })
       const data = await res.json()
