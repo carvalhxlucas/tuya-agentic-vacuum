@@ -1,26 +1,33 @@
+# Environment
 .env
 .env.local
 .env.*.local
+
+# Bot runtime config (stores selected device_id)
+.device_config.json
+
+# Python
+.venv
+venv
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.egg-info
+.eggs
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+# Logs
 *.log
 
-backend/.venv
-backend/venv
-backend/__pycache__
-backend/**/__pycache__
-backend/*.pyc
-backend/.pytest_cache
-backend/.mypy_cache
-backend/*.egg-info
-backend/.eggs
-
-frontend/node_modules
-frontend/dist
-frontend/.vite
-frontend/*.local
-
+# Editors
 .idea
 .vscode
 *.swp
 *.swo
+
+# OS
 .DS_Store
 Thumbs.db
