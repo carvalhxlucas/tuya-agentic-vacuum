@@ -37,6 +37,10 @@ def _get_agent():
     return _agent
 
 
+def _user_id(update: Update) -> str:
+    return str(update.effective_user.id) if update.effective_user else "default"
+
+
 QUICK_ACTIONS_KEYBOARD = InlineKeyboardMarkup([
     [
         InlineKeyboardButton("▶️ Iniciar", callback_data="action:start_cleaning"),
@@ -179,7 +183,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     try:
-        message, _, _ = execute_agent(_get_agent(), text.strip())
+        message, _, _ = execute_agent(_get_agent(), text.strip(), _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await update.message.reply_text("Ocorreu um erro ao processar o comando. Tente novamente.")
@@ -220,7 +224,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info("Voice transcribed: %s", text)
 
     try:
-        message, _, _ = execute_agent(_get_agent(), text)
+        message, _, _ = execute_agent(_get_agent(), text, _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await update.message.reply_text("Ocorreu um erro ao processar o comando.")
@@ -253,7 +257,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     try:
-        message, _, _ = execute_agent(_get_agent(), natural_message)
+        message, _, _ = execute_agent(_get_agent(), natural_message, _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await query.edit_message_text("Ocorreu um erro ao processar o comando.")

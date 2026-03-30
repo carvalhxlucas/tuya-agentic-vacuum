@@ -3,7 +3,7 @@ import os
 import re
 from typing import Any, Optional
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 logger = logging.getLogger(__name__)
 
@@ -17,24 +17,18 @@ from agent.tools import (
 
 ROBOT_TOOLS = [start_cleaning, stop_cleaning, return_to_base, locate_robot, set_clean_mode]
 
-SYSTEM_PROMPT = """You are the control assistant for a vacuum robot. The user gives commands in natural language.
-Your task is to interpret the intent and use EXACTLY one of the available tools.
-Always respond in the same language the user wrote in — if they write in Portuguese, respond in Portuguese; if in English, respond in English.
-Respond briefly and in a friendly way, confirming the action executed.
-Use only the provided tools; do not invent other actions."""
+SYSTEM_PROMPT = (
+    "You are the control assistant for a vacuum robot. The user gives commands in natural language.\n"
+    "Your task is to interpret the intent and use EXACTLY one of the available tools.\n"
+    "Always respond in the same language the user wrote in — Portuguese if they write in Portuguese, English if in English.\n"
+    "After calling a tool, confirm the action in a brief and friendly way.\n"
+    "If the user refers to a previous command (e.g. 'do that again', 'faz de novo'), use the conversation history to infer the intent.\n"
+    "Use only the provided tools; do not invent other actions."
+)
 
-CONFIRMATION_PROMPT = """The vacuum robot successfully executed the command: {action_desc}.
-Write ONE short, friendly sentence confirming this to the user.
-Respond in the same language as the user's original message: "{user_message}"
-Do not add explanations, just the confirmation."""
-
-ACTION_DESCRIPTIONS = {
-    "start_cleaning": "started cleaning",
-    "stop_cleaning": "paused / stopped cleaning",
-    "return_to_base": "is returning to the charging base",
-    "locate_robot": "emitted a locate signal (beep)",
-    "set_clean_mode": "changed the cleaning mode to {mode}",
-}
+# ---------------------------------------------------------------------------
+# Fallback messages (no LLM available)
+# ---------------------------------------------------------------------------
 
 FALLBACK_MESSAGES_PT = {
     "start_cleaning": "Certo, iniciando a limpeza agora.",
@@ -54,11 +48,12 @@ FALLBACK_MESSAGES_EN = {
 
 
 def _is_portuguese(text: str) -> bool:
-    pt_words = {"limpar", "limpa", "limpeza", "iniciar", "inicia", "começa", "começar",
-                "parar", "para", "pausar", "pausa", "voltar", "volta", "base", "carregar",
-                "localizar", "localiza", "onde", "modo", "espiral", "aleatorio", "aleatório"}
-    words = set(text.lower().split())
-    return bool(words & pt_words)
+    pt_words = {
+        "limpar", "limpa", "limpeza", "iniciar", "inicia", "começa", "começar",
+        "parar", "para", "pausar", "pausa", "voltar", "volta", "base", "carregar",
+        "localizar", "localiza", "onde", "modo", "espiral", "aleatorio", "aleatório",
+    }
+    return bool(set(text.lower().split()) & pt_words)
 
 
 def _friendly_message(action: str, params: dict, user_message: str) -> str:
@@ -68,17 +63,6 @@ def _friendly_message(action: str, params: dict, user_message: str) -> str:
     return template.format(mode=mode) if "{mode}" in template else template
 
 
-def _generate_confirmation(llm: Any, action_name: str, args: dict, user_message: str) -> str:
-    try:
-        mode = (args or {}).get("mode", "") if isinstance(args, dict) else ""
-        desc = ACTION_DESCRIPTIONS.get(action_name, action_name).format(mode=mode)
-        prompt = CONFIRMATION_PROMPT.format(action_desc=desc, user_message=user_message)
-        response = llm.invoke([HumanMessage(content=prompt)])
-        return response.content.strip()
-    except Exception:
-        return _friendly_message(action_name, args, user_message)
-
-
 def _fallback_intent(message: str) -> tuple[str, Optional[str], Optional[dict]]:
     text = message.lower().strip()
     pt = _is_portuguese(text)
@@ -86,18 +70,14 @@ def _fallback_intent(message: str) -> tuple[str, Optional[str], Optional[dict]]:
     if any(w in text for w in ["clean", "vacuum", "start", "sweep", "begin",
                                 "limpar", "limpa", "aspirar", "iniciar", "começa", "começar", "limpeza"]):
         return (_friendly_message("start_cleaning", {}, message), "start_cleaning", None)
-
     if any(w in text for w in ["stop", "pause", "halt", "parar", "pausar", "para", "pausa"]):
         return (_friendly_message("stop_cleaning", {}, message), "stop_cleaning", None)
-
     if any(w in text for w in ["return", "base", "dock", "charge", "go back",
-                                "voltar", "volta", "base", "carregar", "carrega"]):
+                                "voltar", "volta", "carregar", "carrega"]):
         return (_friendly_message("return_to_base", {}, message), "return_to_base", None)
-
     if any(w in text for w in ["locate", "find", "where is",
                                 "localizar", "localiza", "onde", "encontrar"]):
         return (_friendly_message("locate_robot", {}, message), "locate_robot", None)
-
     if any(w in text for w in ["mode", "smart", "random", "spiral", "mop", "wall",
                                 "modo", "espiral", "aleatorio", "aleatório", "esfregão"]):
         mode = "smart"
@@ -117,50 +97,101 @@ def _fallback_intent(message: str) -> tuple[str, Optional[str], Optional[dict]]:
 
 
 def _is_error(result: str) -> bool:
-    lowered = result.lower()
-    return any(w in lowered for w in ("not configured", "failed", "rejected", "error", "invalid"))
+    return any(w in result.lower() for w in ("not configured", "failed", "rejected", "error", "invalid"))
 
 
-def create_agent() -> Any:
+def _extract_tool_call(messages: list) -> tuple[Optional[str], Optional[dict]]:
+    """Extracts the last tool call name and args from a LangGraph messages list."""
+    for msg in reversed(messages):
+        if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+            tc = msg.tool_calls[0]
+            name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", None)
+            args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+            return name, args if isinstance(args, dict) else None
+    return None, None
+
+
+# ---------------------------------------------------------------------------
+# Agent creation
+# ---------------------------------------------------------------------------
+
+def _build_llm() -> Any:
+    """Tries Ollama first, falls back to OpenAI. Returns None if neither is available."""
+    try:
+        from langchain_ollama import ChatOllama
+        model = os.getenv("OLLAMA_MODEL", "qwen2.5:3b")
+        base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+        llm = ChatOllama(model=model, base_url=base_url, temperature=0.3)
+        llm.invoke("ping")
+        logger.info("Using Ollama: %s", model)
+        return llm
+    except Exception as e:
+        logger.info("Ollama unavailable (%s), trying OpenAI.", e)
+
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
         try:
             from langchain_openai import ChatOpenAI
             llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.3)
-            return {"type": "langchain", "llm": llm.bind_tools(ROBOT_TOOLS), "llm_base": llm}
-        except Exception:
-            pass
-    return {"type": "fallback"}
+            logger.info("Using OpenAI gpt-4o-mini.")
+            return llm
+        except Exception as e:
+            logger.info("OpenAI unavailable (%s).", e)
+
+    return None
 
 
-def execute_agent(agent: Any, message: str) -> tuple[str, Optional[str], Optional[dict]]:
+def create_agent() -> Any:
+    from langgraph.checkpoint.memory import MemorySaver
+    from langgraph.prebuilt import create_react_agent
+
+    llm = _build_llm()
+    if llm is None:
+        logger.warning("No LLM available — using regex fallback.")
+        return {"type": "fallback"}
+
+    memory = MemorySaver()
+    graph = create_react_agent(
+        model=llm,
+        tools=ROBOT_TOOLS,
+        prompt=SYSTEM_PROMPT,
+        checkpointer=memory,
+    )
+    logger.info("LangGraph ReAct agent created with per-user memory.")
+    return {"type": "langgraph", "graph": graph}
+
+
+# ---------------------------------------------------------------------------
+# Execution
+# ---------------------------------------------------------------------------
+
+def execute_agent(
+    agent: Any,
+    message: str,
+    user_id: str = "default",
+) -> tuple[str, Optional[str], Optional[dict]]:
     if agent.get("type") == "fallback":
         return _fallback_intent(message)
-    llm = agent.get("llm")
-    if not llm:
+
+    graph = agent.get("graph")
+    if not graph:
         return _fallback_intent(message)
+
+    config = {"configurable": {"thread_id": str(user_id)}}
+
     try:
-        messages = [
-            SystemMessage(content=SYSTEM_PROMPT),
-            HumanMessage(content=message),
-        ]
-        response = llm.invoke(messages)
-        if hasattr(response, "tool_calls") and response.tool_calls:
-            tc = response.tool_calls[0]
-            name = tc.get("name") or (getattr(tc, "name", None))
-            args = tc.get("args") or {}
-            if hasattr(tc, "args"):
-                args = tc.args or args
-            tool_map = {t.name: t for t in ROBOT_TOOLS}
-            if name in tool_map:
-                logger.info("Calling tool %s with args %s", name, args)
-                result = tool_map[name].invoke(args)
-                logger.info("Tool %s returned: %s", name, result)
-                if isinstance(result, str) and _is_error(result):
-                    return (result, None, None)
-                confirmation = _generate_confirmation(agent["llm_base"], name, args, message)
-                return (confirmation, name, args if isinstance(args, dict) else None)
-        return (response.content or "Command processed.", None, None)
+        result = graph.invoke(
+            {"messages": [HumanMessage(content=message)]},
+            config=config,
+        )
+        last_msg = result["messages"][-1]
+        response_text = last_msg.content if isinstance(last_msg.content, str) else str(last_msg.content)
+
+        action_name, action_params = _extract_tool_call(result["messages"])
+        logger.info("user=%s action=%s params=%s", user_id, action_name, action_params)
+
+        return (response_text, action_name, action_params)
+
     except Exception as e:
-        logger.error("Agent error: %s", e)
+        logger.error("Graph invocation error (user=%s): %s", user_id, e)
         return _fallback_intent(message)
