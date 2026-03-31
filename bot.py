@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import tempfile
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.error import TimedOut
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -127,7 +129,7 @@ def _transcribe_audio(file_path: str) -> str | None:
 
 async def cmd_devices(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    devices = list_devices()
+    devices = await asyncio.to_thread(list_devices)
 
     if not devices:
         await update.message.reply_text(
@@ -165,7 +167,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def cmd_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
-    state = get_device_state()
+    state = await asyncio.to_thread(get_device_state)
     if state is None:
         await update.message.reply_text(
             "❌ Não foi possível obter o estado do robô. Verifique as credenciais Tuya no .env.",
@@ -183,7 +185,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     await context.bot.send_chat_action(chat_id=update.effective_chat.id, action="typing")
     try:
-        message, _, _ = execute_agent(_get_agent(), text.strip(), _user_id(update))
+        message, _, _ = await asyncio.to_thread(execute_agent, _get_agent(), text.strip(), _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await update.message.reply_text("Ocorreu um erro ao processar o comando. Tente novamente.")
@@ -210,7 +212,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Não consegui processar o áudio. Tente novamente.")
         return
 
-    text = _transcribe_audio(tmp_path)
+    text = await asyncio.to_thread(_transcribe_audio, tmp_path)
 
     try:
         os.unlink(tmp_path)
@@ -224,7 +226,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     logger.info("Voice transcribed: %s", text)
 
     try:
-        message, _, _ = execute_agent(_get_agent(), text, _user_id(update))
+        message, _, _ = await asyncio.to_thread(execute_agent, _get_agent(), text, _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await update.message.reply_text("Ocorreu um erro ao processar o comando.")
@@ -257,7 +259,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return
 
     try:
-        message, _, _ = execute_agent(_get_agent(), natural_message, _user_id(update))
+        message, _, _ = await asyncio.to_thread(execute_agent, _get_agent(), natural_message, _user_id(update))
     except Exception as e:
         logger.error("Agent error: %s", e)
         await query.edit_message_text("Ocorreu um erro ao processar o comando.")
@@ -266,12 +268,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     await query.edit_message_text(message, reply_markup=QUICK_ACTIONS_KEYBOARD)
 
 
+async def handle_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if isinstance(context.error, TimedOut):
+        logger.warning("Telegram request timed out (transient): %s", context.error)
+        return
+    logger.error("Unhandled exception", exc_info=context.error)
+
+
 def main() -> None:
     token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN não configurado no .env")
 
     app = Application.builder().token(token).build()
+    app.add_error_handler(handle_error)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("devices", cmd_devices))
